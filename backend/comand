@@ -1,0 +1,19 @@
+# 1. Generate Prisma client
+
+npx prisma generate
+
+# 2. Create and apply migrations
+
+npx prisma migrate dev --name init
+
+# 3. Seed the database using Prisma's built-in command
+
+npx prisma db seed
+
+# Or use your custom seed script
+
+npm run prisma:seed
+
+# 4. Start the server
+
+npm run start:dev

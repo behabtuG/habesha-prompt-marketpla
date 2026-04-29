@@ -1,0 +1,177 @@
+// Complete schema.prisma with all enums
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Add these enums
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum PurchaseStatus {
+  PENDING
+  WAITING_VERIFICATION
+  PENDING_VERIFICATION
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  TELEGRAM_STARS
+  TON
+  LOCAL_BIRR
+}
+
+enum SubscriptionStatus {
+  FREE
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PRO
+  ULTIMATE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  telegramId   BigInt   @unique
+  username     String?  @unique
+  firstName    String?
+  lastName     String?
+  role               UserRole           @default(USER)
+  isAdmin            Boolean            @default(false)
+  balanceStars       Int                @default(0)
+  totalSpent         Float              @default(0)
+  subscriptionStatus SubscriptionStatus @default(FREE)
+  subscriptionTier   SubscriptionTier   @default(FREE)
+  subscriptionExpiresAt DateTime?
+  categoryCredits    Json?
+  lastCreditRefresh  DateTime?         @default(now())
+  telegramData       Json?
+  metadata           Json?
+
+  purchases          Purchase[]
+  prompts            Prompt[]
+  adminLogs          AdminLog[]
+  contactSubmissions ContactSubmission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([telegramId])
+  @@index([username])
+}
+
+model Prompt {
+  id             String     @id @default(cuid())
+  title          String
+  slug           String     @unique
+  description    String
+  category       String
+  previewContent String
+  fullContent    String
+  imageUrl       String?
+  imageAlt       String?
+  exampleOutput  Json?
+  priceStars     Int
+  priceTon       Float?
+  priceLocal     Float?
+  purchaseCount  Int        @default(0)
+  rating         Float      @default(0)
+  isPremium      Boolean    @default(true)
+  isActive       Boolean    @default(true)
+  version        Int        @default(1)
+  creatorId      String?
+  creator        User?      @relation(fields: [creatorId], references: [id])
+  purchases      Purchase[]
+  tags           Tag[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([isActive])
+  @@index([priceStars])
+  @@index([creatorId])
+}
+
+model Purchase {
+  id               String         @id @default(cuid())
+  userId           String
+  promptId         String
+  status           PurchaseStatus @default(PENDING)  // Only add this enum
+  paymentMethod    String         // Keep as String to avoid breaking changes
+  paymentId        String?        @unique
+  amountPaid       Float
+  currency         String
+  manualPaymentData Json?
+  verifiedBy       String?
+  verificationNotes String?
+  metadata         Json?
+  verifiedAt       DateTime?
+  refundedAt       DateTime?
+  
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prompt Prompt @relation(fields: [promptId], references: [id])
+  
+  unlockedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([promptId])
+  @@index([status])
+  @@index([paymentId])
+  @@index([createdAt])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  prompts   Prompt[]
+  createdAt DateTime @default(now())
+}
+
+model AdminLog {
+  id      String @id @default(cuid())
+  adminId String
+  action  String
+  details Json?
+
+  admin User @relation(fields: [adminId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([createdAt])
+}
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  status    String   @default("PENDING") // PENDING, RESPONDED, CLOSED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}

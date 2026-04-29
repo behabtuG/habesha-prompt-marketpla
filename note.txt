@@ -1,0 +1,8 @@
+start the gork => ngrok http 3000      
+start the backend =>npm run start:dev
+start the frontend =>npm run dev
+start the telegram-bot =>npm run dev
+
+to migrate db 
+npx prisma generate
+npx prisma migrate dev --name init

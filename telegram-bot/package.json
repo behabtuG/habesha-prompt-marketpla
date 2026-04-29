@@ -1,0 +1,27 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "setup": "tsx src/setup.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "dev:https": "npm run ngrok && npm run dev",
+    "ngrok": "tsx scripts/setup-ngrok.ts",
+    "webhook": "tsx src/set-webhook.ts",
+    "bot": "npm run build && npm start",
+    "bot:dev": "npm run dev"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^5.2.1",
+    "telegraf": "^4.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
