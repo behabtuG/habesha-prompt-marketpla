@@ -1,4 +1,5 @@
 start the gork => ngrok http 3000      
+start the gork => npx localtunnel --port 3000 --subdomain habeshaprompt      
 start the backend =>npm run start:dev
 start the frontend =>npm run dev
 start the telegram-bot =>npm run dev

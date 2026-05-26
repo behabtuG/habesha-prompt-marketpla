@@ -1,268 +1,292 @@
-// app/(miniapp)/my-prompts/page.tsx
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { PromptCard } from "@/components/PromptCard";
-import {
-  ArrowLeft,
-  Package,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Package, ArrowLeft, Loader2, Sparkles, Copy, Calendar, Award } from "lucide-react";
 import Link from "next/link";
-import { useAuthStore } from "@/store/useAuthStore";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { getImageUrl } from "@/lib/image-utils";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
-export default function MyPrompts() {
-  const router = useRouter();
-  const { user } = useAuthStore();
-  const [refreshing, setRefreshing] = useState(false);
+export default function MyPromptsPage() {
+  const [activeTab, setActiveTab] = useState<"created" | "purchased">("created");
 
-  // Redirect if not logged in
-  useEffect(() => {
-    if (!user) {
-      router.push("/");
-    }
-  }, [user, router]);
-
-  const {
-    data: purchases = [],
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["my-purchases"],
-    queryFn: () => api.get("/payments/purchases").then((res) => res.data.data),
-    enabled: !!user,
+  const { data: createdData, isLoading: isLoadingCreated } = useQuery({
+    queryKey: ["my-prompts", "created"],
+    queryFn: () => api.get("/prompts/created").then((res) => res.data),
   });
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-    toast.success("Refreshed your prompts");
+  const { data: purchasedData, isLoading: isLoadingPurchased } = useQuery({
+    queryKey: ["my-prompts", "purchased"],
+    queryFn: () => api.get("/prompts/purchased").then((res) => res.data),
+  });
+
+  const createdPrompts = createdData?.data || [];
+  const purchasedPrompts = purchasedData?.data || [];
+
+  const isLoading = isLoadingCreated || isLoadingPurchased;
+
+  const handleCopyPrompt = (content: string, title: string) => {
+    if (!content) {
+      toast.error("Prompt content is empty.");
+      return;
+    }
+    navigator.clipboard.writeText(content);
+    toast.success(`Prompt content for "${title}" copied to clipboard! 📋`);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen p-4 max-w-6xl mx-auto">
-        <div className="text-center py-20">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading your prompts...</p>
-        </div>
-      </div>
-    );
-  }
+  const getSalesStats = (purchases: any[] = []) => {
+    let starsCount = 0;
+    let starsRevenue = 0;
+    let tonCount = 0;
+    let tonRevenue = 0;
+    let birrCount = 0;
+    let birrRevenue = 0;
 
-  if (error) {
-    return (
-      <div className="min-h-screen p-4 max-w-6xl mx-auto">
-        <div className="text-center py-20">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Failed to load prompts</h3>
-          <p className="text-muted-foreground mb-6">
-            Please check your connection and try again
-          </p>
-          <Button onClick={handleRefresh} disabled={refreshing}>
-            Try Again
-          </Button>
-        </div>
-      </div>
-    );
-  }
+    purchases.forEach((p: any) => {
+      const amount = p.amountPaid || 0;
+      if (p.paymentMethod === "TELEGRAM_STARS") {
+        starsCount++;
+        starsRevenue += amount;
+      } else if (p.paymentMethod === "TON") {
+        tonCount++;
+        tonRevenue += amount;
+      } else if (p.paymentMethod === "LOCAL_BIRR") {
+        birrCount++;
+        birrRevenue += amount;
+      }
+    });
 
-  const purchasedPrompts = purchases.map((p: any) => {
-    const transformed = {
-      ...p.prompt,
-      purchaseStatus: p.status,
-      purchasedAt: p.unlockedAt || p.createdAt,
-      purchaseId: p.id,
-      hasAccess: p.status === "COMPLETED",
+    return {
+      starsCount,
+      starsRevenue,
+      tonCount,
+      tonRevenue,
+      birrCount,
+      birrRevenue,
+      total: purchases.length,
     };
-
-    return transformed;
-  });
-
-  // Group by status
-  const activePrompts = purchasedPrompts.filter(
-    (p: any) => p.purchaseStatus === "COMPLETED"
-  );
-  const pendingPrompts = purchasedPrompts.filter(
-    (p: any) => p.purchaseStatus === "PENDING_VERIFICATION"
-  );
-  const failedPrompts = purchasedPrompts.filter(
-    (p: any) => p.purchaseStatus === "FAILED" || p.purchaseStatus === "REFUNDED"
-  );
+  };
 
   return (
-    <div className="min-h-screen p-4 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Link href="/">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to Home
-                </Button>
-              </Link>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={refreshing}
-              >
-                Refresh
-              </Button>
-            </div>
-            <h1 className="text-3xl font-bold">My Prompts</h1>
-            <p className="text-muted-foreground mt-1">
-              All your purchased prompts in one place
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-2xl font-bold">
-                {purchasedPrompts.length}
-              </div>
-              <div className="text-sm text-muted-foreground">Total Prompts</div>
-            </div>
-            {/* <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-              <Package className="w-6 h-6 text-white" />
-            </div> */}
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 p-4 rounded-xl border">
-            <div className="text-2xl font-bold text-green-700 dark:text-green-300">
-              {activePrompts.length}
-            </div>
-            <div className="text-sm text-green-600 dark:text-green-400">
-              Active Prompts
-            </div>
-          </div>
-          <div className="bg-gradient-to-r from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20 p-4 rounded-xl border">
-            <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
-              {pendingPrompts.length}
-            </div>
-            <div className="text-sm text-yellow-600 dark:text-yellow-400">
-              Pending Verification
-            </div>
-          </div>
-          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 p-4 rounded-xl border">
-            <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-              {failedPrompts.length}
-            </div>
-            <div className="text-sm text-blue-600 dark:text-blue-400">
-              Failed/Refunded
-            </div>
-          </div>
+    <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="flex items-center gap-4 mb-10">
+        <Link href="/">
+          <Button variant="ghost" size="icon" className="rounded-full">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+        </Link>
+        <div>
+          <h1 className="text-4xl font-black tracking-tight">My Prompts</h1>
+          <p className="text-slate-400 font-medium">Manage and view your prompts</p>
         </div>
       </div>
 
-      {/* No prompts */}
-      {purchasedPrompts.length === 0 ? (
-        <div className="text-center py-16 border-2 border-dashed rounded-2xl bg-gradient-to-b from-muted/30 to-muted/10">
-          <div className="w-20 h-20 bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-800 dark:to-gray-900 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Package className="w-10 h-10 text-gray-400" />
-          </div>
-          <h3 className="text-xl font-semibold mb-2">No prompts yet</h3>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            You haven't purchased any prompts yet. Start exploring our
-            marketplace to find amazing prompts!
-          </p>
-          <div className="flex gap-3 justify-center">
-            <Link href="/">
-              <Button>Browse Prompts</Button>
-            </Link>
-            <Link href="/categories">
-              <Button variant="outline">View Categories</Button>
-            </Link>
-          </div>
+      {/* Tabs */}
+      <div className="flex gap-2 p-1.5 bg-slate-100 rounded-2xl mb-8 max-w-md">
+        <button
+          onClick={() => setActiveTab("created")}
+          className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
+            activeTab === "created"
+              ? "bg-white text-black shadow-sm"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          My Creations ({createdPrompts.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("purchased")}
+          className={`flex-1 py-3 text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
+            activeTab === "purchased"
+              ? "bg-white text-black shadow-sm"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Purchases ({purchasedPrompts.length})
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center items-center py-24">
+          <Loader2 className="w-12 h-12 animate-spin text-slate-300" />
         </div>
-      ) : (
-        <div className="space-y-12">
-          {/* Pending Prompts */}
-          {pendingPrompts.length > 0 && (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
-                  <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                <h2 className="text-xl font-bold">Pending Verification</h2>
-                <Badge variant="secondary" className="ml-2">
-                  {pendingPrompts.length}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mb-6">
-                These prompts are waiting for admin verification. Usually takes
-                1-24 hours.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {pendingPrompts.map((prompt: any) => (
-                  <PromptCard key={prompt.id} prompt={prompt} />
-                ))}
-              </div>
+      ) : activeTab === "created" ? (
+        createdPrompts.length === 0 ? (
+          <Card className="border-none shadow-sm p-20 text-center bg-white rounded-[3rem] border border-slate-100">
+            <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+              <Package className="w-12 h-12 text-slate-200" />
             </div>
-          )}
-
-          {/* Active Prompts */}
-          {activePrompts.length > 0 && (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                </div>
-                <h2 className="text-xl font-bold">Active Prompts</h2>
-                <Badge variant="secondary" className="ml-2">
-                  {activePrompts.length}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mb-6">
-                You have full access to these prompts. Click to view the full
-                content.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activePrompts.map((prompt: any) => (
-                  <PromptCard key={prompt.id} prompt={prompt} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Failed Prompts */}
-          {failedPrompts.length > 0 && (
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
-                  <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                </div>
-                <h2 className="text-xl font-bold">Failed/Refunded</h2>
-                <Badge variant="secondary" className="ml-2">
-                  {failedPrompts.length}
-                </Badge>
-              </div>
-              <p className="text-sm text-muted-foreground mb-6">
-                These purchases were unsuccessful or refunded.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {failedPrompts.map((prompt: any) => (
-                  <div key={prompt.id} className="opacity-50">
-                    <PromptCard prompt={prompt} />
+            <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight mb-3">No Creations Yet</h3>
+            <p className="text-slate-400 font-medium mb-10 max-w-sm mx-auto text-sm">
+              You haven't submitted any prompts yet. Share your creations to start earning!
+            </p>
+            <Link href="/share">
+              <Button className="h-14 px-10 bg-black text-white hover:bg-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-black/10 active:scale-95">
+                Share a Prompt
+              </Button>
+            </Link>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {createdPrompts.map((prompt: any) => {
+              const stats = getSalesStats(prompt.purchases || []);
+              return (
+                <Card key={prompt.id} className="overflow-hidden border-none shadow-sm rounded-3xl group flex flex-col justify-between">
+                  <div>
+                    <div className="aspect-video w-full bg-slate-100 relative overflow-hidden">
+                      {prompt.imageUrl ? (
+                        <img 
+                          src={getImageUrl(prompt.imageUrl)} 
+                          alt={prompt.title} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-12 h-12 text-slate-300" />
+                        </div>
+                      )}
+                      
+                      <div className="absolute top-4 right-4 flex gap-2">
+                        <Badge className={prompt.isActive ? "bg-emerald-500 hover:bg-emerald-600 border-none px-3 py-1 rounded-full text-xs font-bold text-white" : "bg-amber-500 hover:bg-amber-600 border-none px-3 py-1 rounded-full text-xs font-bold text-white"}>
+                          {prompt.isActive ? "Active" : "Pending Review"}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-xl font-black truncate">{prompt.title}</CardTitle>
+                      <CardDescription className="line-clamp-2 mt-2 font-medium text-slate-500">{prompt.description}</CardDescription>
+                    </CardHeader>
                   </div>
-                ))}
+                  
+                  <div>
+                    <CardContent className="pt-0">
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                          {prompt.category.replace("_", " ")}
+                        </span>
+                        <div className="flex items-center gap-1.5 font-bold text-slate-700 bg-yellow-50 px-3 py-1 rounded-full">
+                          <Sparkles className="w-3.5 h-3.5 text-yellow-500" />
+                          <span>{prompt.priceStars > 0 ? `${prompt.priceStars} Stars` : "Free"}</span>
+                        </div>
+                      </div>
+
+                      {/* Sales Stats Box */}
+                      <div className="pt-4 border-t border-slate-100 space-y-3">
+                        <div className="flex justify-between items-center text-xs font-black uppercase tracking-wider text-slate-400">
+                          <span>Sales Performance</span>
+                          <span className="text-black font-black text-sm">{stats.total} {stats.total === 1 ? 'Sale' : 'Sales'}</span>
+                        </div>
+                        
+                        {stats.total > 0 ? (
+                          <div className="grid grid-cols-3 gap-2">
+                            {stats.starsCount > 0 && (
+                              <div className="p-2 rounded-xl bg-amber-50/50 border border-amber-100 flex flex-col items-center justify-center">
+                                <span className="text-xs font-black text-amber-600">⭐ {stats.starsCount}</span>
+                                <span className="text-[9px] font-bold text-amber-500 uppercase mt-0.5">{stats.starsRevenue} Stars</span>
+                              </div>
+                            )}
+                            {stats.tonCount > 0 && (
+                              <div className="p-2 rounded-xl bg-blue-50/50 border border-blue-100 flex flex-col items-center justify-center">
+                                <span className="text-xs font-black text-blue-600">💎 {stats.tonCount}</span>
+                                <span className="text-[9px] font-bold text-blue-500 uppercase mt-0.5">{stats.tonRevenue.toFixed(2)} TON</span>
+                              </div>
+                            )}
+                            {stats.birrCount > 0 && (
+                              <div className="p-2 rounded-xl bg-emerald-50/50 border border-emerald-100 flex flex-col items-center justify-center">
+                                <span className="text-xs font-black text-emerald-600">🇪🇹 {stats.birrCount}</span>
+                                <span className="text-[9px] font-bold text-emerald-500 uppercase mt-0.5">{stats.birrRevenue} ETB</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-slate-400 text-xs italic text-center py-2">No sales yet. Keep sharing!</p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )
+      ) : purchasedPrompts.length === 0 ? (
+        <Card className="border-none shadow-sm p-20 text-center bg-white rounded-[3rem] border border-slate-100">
+          <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-inner">
+            <Package className="w-12 h-12 text-slate-200" />
+          </div>
+          <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight mb-3">No Purchases Yet</h3>
+          <p className="text-slate-400 font-medium mb-10 max-w-sm mx-auto text-sm">
+            You haven't purchased any prompts yet. Browse the marketplace to find your favorite AI prompts.
+          </p>
+          <Link href="/">
+            <Button className="h-14 px-10 bg-black text-white hover:bg-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-black/10 active:scale-95">
+              Browse Marketplace
+            </Button>
+          </Link>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {purchasedPrompts.map((prompt: any) => (
+            <Card key={prompt.id} className="overflow-hidden border-none shadow-sm rounded-3xl group flex flex-col justify-between">
+              <div>
+                <div className="aspect-video w-full bg-slate-100 relative overflow-hidden">
+                  {prompt.imageUrl ? (
+                    <img 
+                      src={getImageUrl(prompt.imageUrl)} 
+                      alt={prompt.title} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-12 h-12 text-slate-300" />
+                    </div>
+                  )}
+                  
+                  <div className="absolute top-4 right-4 flex gap-2">
+                    <Badge className="bg-slate-950 hover:bg-slate-900 border-none px-3 py-1 rounded-full text-xs font-bold text-white flex items-center gap-1">
+                      <Award className="w-3 h-3 text-yellow-500" /> Unlocked
+                    </Badge>
+                  </div>
+                </div>
+                
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-xl font-black truncate">{prompt.title}</CardTitle>
+                  <CardDescription className="line-clamp-2 mt-2 font-medium text-slate-500">{prompt.description}</CardDescription>
+                </CardHeader>
               </div>
-            </div>
-          )}
+
+              <div>
+                <CardContent className="pt-0">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                      {prompt.category.replace("_", " ")}
+                    </span>
+                    <div className="flex items-center gap-1 mt-0.5 text-xs text-slate-400 font-bold">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>{prompt.purchasedAt ? new Date(prompt.purchasedAt).toLocaleDateString() : 'Recently'}</span>
+                    </div>
+                  </div>
+
+                  {prompt.decryptedContent ? (
+                    <Button 
+                      onClick={() => handleCopyPrompt(prompt.decryptedContent, prompt.title)}
+                      className="w-full h-12 bg-slate-900 text-white hover:bg-black rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 active:scale-95"
+                    >
+                      <Copy className="w-4 h-4" /> Copy Prompt Content
+                    </Button>
+                  ) : (
+                    <div className="text-center p-3 bg-red-50 text-red-500 text-xs font-bold rounded-2xl">
+                      Content not available.
+                    </div>
+                  )}
+                </CardContent>
+              </div>
+            </Card>
+          ))}
         </div>
       )}
     </div>

@@ -20,6 +20,11 @@ import {
   Eye,
   RefreshCw,
   AlertCircle,
+  DollarSign,
+  Calendar,
+  Clock,
+  ShieldCheck,
+  User as UserIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -60,7 +65,7 @@ export default function ManualPaymentsPage() {
         })
         .then((res) => res.data),
     onSuccess: () => {
-      toast.success("Payment verified!");
+      toast.success("Payment verified successfully!");
       queryClient.invalidateQueries({ queryKey: ["pending-manual-payments"] });
       setVerifyDialogOpen(false);
       setVerificationNotes("");
@@ -69,24 +74,6 @@ export default function ManualPaymentsPage() {
       toast.error(error.response?.data?.message || "Failed to verify payment");
     },
   });
-
-  // Filter payments based on search term
-  // const filteredPayments = pendingPayments.filter((payment: any) => {
-  //   if (!searchTerm) return true;
-
-  //   const searchLower = searchTerm.toLowerCase();
-  //   return (
-  //     payment.id.toLowerCase().includes(searchLower) ||
-  //     (payment.user?.username || "").toLowerCase().includes(searchLower) ||
-  //     (payment.user?.firstName || "").toLowerCase().includes(searchLower) ||
-  //     (payment.manualPaymentData?.bankName || "")
-  //       .toLowerCase()
-  //       .includes(searchLower) ||
-  //     (payment.manualPaymentData?.referenceNumber || "")
-  //       .toLowerCase()
-  //       .includes(searchLower)
-  //   );
-  // });
 
   // Reject mutation
   const rejectMutation = useMutation({
@@ -97,7 +84,7 @@ export default function ManualPaymentsPage() {
         })
         .then((res) => res.data),
     onSuccess: () => {
-      toast.success("Payment rejected!");
+      toast.success("Payment rejected");
       queryClient.invalidateQueries({ queryKey: ["pending-manual-payments"] });
       setRejectDialogOpen(false);
       setVerificationNotes("");
@@ -120,21 +107,12 @@ export default function ManualPaymentsPage() {
   const handleViewReceipt = (payment: any) => {
     const receiptUrl = payment.manualPaymentData?.receiptUrl;
     if (receiptUrl) {
-      // Check if URL already has the correct format
       let fullUrl = receiptUrl;
-
-      // If it starts with /api/uploads, remove /api
       if (receiptUrl.startsWith("/api/uploads")) {
         fullUrl = receiptUrl.replace("/api/uploads", "/uploads");
+      } else if (receiptUrl.startsWith("/uploads")) {
+        fullUrl = `${process.env.NEXT_PUBLIC_API_URL?.replace("/api", "")}${receiptUrl}`;
       }
-      // If it's just a path starting with /uploads, add the base URL
-      else if (receiptUrl.startsWith("/uploads")) {
-        fullUrl = `${process.env.NEXT_PUBLIC_API_URL?.replace(
-          "/api",
-          ""
-        )}${receiptUrl}`;
-      }
-
       window.open(fullUrl, "_blank");
     } else {
       toast.error("Receipt not available");
@@ -142,306 +120,280 @@ export default function ManualPaymentsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">Manual Payment Verification</h2>
-        <p className="text-muted-foreground">
-          Review and verify bank transfer payments
-        </p>
-      </div>
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2">
+        <div>
+          <div className="flex items-center gap-5">
+            <div className="w-10 h-10 rounded-[1.5rem] bg-amber-500 flex items-center justify-center text-white shadow-xl shadow-amber-500/20">
+              <DollarSign className="w-8 h-8" />
+            </div>
             <div>
-              <CardTitle>Pending Verification</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                {pendingPayments.length} payments awaiting review
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-2">Verification Hub</h1>
+              <p className="text-slate-500 font-medium text-sm flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
+                Review and approve manual bank transfers
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Search by ID, user, or bank..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 w-full sm:w-64"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  queryClient.invalidateQueries({
-                    queryKey: ["pending-manual-payments"],
-                  })
-                }
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh
-              </Button>
-            </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto" />
-            </div>
-          ) : pendingPayments.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No pending payments for verification
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+            <Input
+              placeholder="Search Reference #..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-14 w-full md:w-80 rounded-2xl border-none bg-white px-12 font-bold text-slate-700 shadow-sm shadow-black/5 focus:ring-2 focus:ring-indigo-500/10 transition-all placeholder:text-slate-300"
+            />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["pending-manual-payments"] })}
+            className="h-14 w-14 rounded-2xl bg-white shadow-sm shadow-black/5 hover:bg-slate-50 transition-all"
+          >
+            <RefreshCw className={`w-5 h-5 text-slate-400 ${isLoading ? 'animate-spin text-indigo-500' : ''}`} />
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Stats Summary ─────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
+        <Card className="border-none shadow-sm p-8 bg-white rounded-[2.5rem] space-y-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Awaiting Review</p>
+            <p className="text-2xl font-black text-slate-900 tabular-nums">
+              {pendingPayments.length}
+              <span className="text-xs text-slate-400 font-bold uppercase tracking-widest ml-1">In Pipeline</span>
+            </p>
+          </div>
+        </Card>
+        <Card className="border-none shadow-sm p-8 bg-white rounded-[2.5rem] space-y-4">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Action Required</p>
+            <p className="text-2xl font-black text-slate-900 tabular-nums">
+              {pendingPayments.filter((p: any) => p.status === 'PENDING_VERIFICATION').length}
+              <span className="text-xs text-emerald-400 font-bold uppercase tracking-widest ml-1">Receipts</span>
+            </p>
+          </div>
+        </Card>
+        <Card className="border-none shadow-sm p-8 bg-white rounded-[2.5rem] space-y-4">
+          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Waiting for User</p>
+            <p className="text-2xl font-black text-slate-900 tabular-nums">
+              {pendingPayments.filter((p: any) => p.status === 'WAITING_VERIFICATION').length}
+              <span className="text-xs text-indigo-400 font-bold uppercase tracking-widest ml-1">Pending</span>
+            </p>
+          </div>
+        </Card>
+      </div>
+
+      {/* ── Payments Ledger ────────────────────────────────────────────────── */}
+      <Card className="border-none shadow-xl shadow-black/5 bg-white rounded-[3rem] overflow-hidden">
+        <div className="overflow-x-auto">
+          {pendingPayments.length === 0 && !isLoading ? (
+            <div className="text-center py-24">
+              <div className="w-20 h-20 bg-emerald-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8 animate-bounce">
+                <CheckCircle className="w-10 h-10 text-emerald-500" />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">Everything is Clear!</h3>
+              <p className="text-slate-400 font-medium text-sm mt-2 uppercase tracking-widest">No manual payments are currently awaiting verification.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Purchase ID</TableHead>
-                    <TableHead>User</TableHead>
-                    <TableHead>Prompt</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Bank Details</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>Uploaded</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingPayments.map((payment: any) => (
-                    <TableRow key={payment.id}>
-                      <TableCell>
-                        <code className="text-xs">
-                          {payment.id.substring(0, 8)}
-                        </code>
-                      </TableCell>
-                      <TableCell>
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-slate-50 bg-slate-50/50 hover:bg-transparent">
+                  <TableHead className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Originator</TableHead>
+                  <TableHead className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-center">Value (Fiat)</TableHead>
+                  <TableHead className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Financial Institution</TableHead>
+                  <TableHead className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Reference Details</TableHead>
+                  <TableHead className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Verification</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingPayments.map((payment: any) => (
+                  <TableRow key={payment.id} className="group hover:bg-slate-50/50 transition-all duration-300 border-b border-slate-50">
+                    <TableCell className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-xs font-black text-slate-500 group-hover:scale-110 transition-transform">
+                          {payment.user?.firstName?.charAt(0) || "U"}
+                        </div>
                         <div>
-                          <div className="font-medium">
-                            {payment.user.firstName || payment.user.username}
+                          <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{payment.user?.firstName || "Unknown"}</p>
+                          <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase">@{payment.user?.username || "unknown"}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-8 py-6 text-center">
+                      <div className="inline-flex flex-col items-center">
+                        <span className="text-sm font-black text-emerald-600 tabular-nums">{payment.amountPaid} {payment.currency}</span>
+                        <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">Manual Transfer</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-8 py-6">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black text-slate-700 uppercase">{payment.manualPaymentData?.bankName}</span>
+                        <span className="text-[10px] font-bold text-slate-400 tracking-widest mt-1">ACC: {payment.manualPaymentData?.accountNumber}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-8 py-6">
+                      <div className="flex flex-col gap-1.5">
+                        {payment.status === 'PENDING_VERIFICATION' ? (
+                          <>
+                            <code className="text-[11px] font-black text-indigo-500 bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-100 w-fit">
+                              {payment.manualPaymentData?.referenceNumber}
+                            </code>
+                            <span className="text-[9px] font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1">
+                              <Calendar className="w-2.5 h-2.5" /> {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(payment.updatedAt || payment.createdAt))}
+                            </span>
+                          </>
+                        ) : (
+                          <div className="px-3 py-1 bg-slate-50 text-slate-400 rounded-lg border border-slate-100 text-[10px] font-black uppercase tracking-widest w-fit">
+                            Waiting for Receipt
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            @{payment.user.username}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-[200px] truncate">
-                          {payment.prompt.title}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="font-bold">
-                          {payment.amountPaid} {payment.currency}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{payment.manualPaymentData?.bankName}</div>
-                          <div className="text-muted-foreground">
-                            {payment.manualPaymentData?.accountNumber}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <code className="text-xs">
-                          {payment.manualPaymentData?.referenceNumber}
-                        </code>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(
-                          payment.manualPaymentData?.uploadedAt
-                        ).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleViewReceipt(payment)}
-                          >
-                            <Eye className="w-3 h-3 mr-1" />
-                            Receipt
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => handleVerify(payment)}
-                          >
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Verify
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleReject(payment)}
-                          >
-                            <XCircle className="w-3 h-3 mr-1" />
-                            Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="px-8 py-6 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={payment.status === 'WAITING_VERIFICATION'}
+                          onClick={() => handleViewReceipt(payment)}
+                          className="h-10 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all disabled:opacity-30"
+                        >
+                          <Eye className="w-3.5 h-3.5 mr-2" /> View
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={payment.status === 'WAITING_VERIFICATION'}
+                          onClick={() => handleVerify(payment)}
+                          className="h-10 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#0f172a] text-white hover:bg-emerald-500 shadow-xl shadow-black/10 active:scale-95 transition-all disabled:opacity-30"
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleReject(payment)}
+                          className="h-10 w-10 rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all"
+                        >
+                          <XCircle className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
-        </CardContent>
+        </div>
       </Card>
 
-      {/* Verify Dialog */}
+      {/* Verify Dialog (Standardized Styling) */}
       <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-[2.5rem] border-none p-10">
           <DialogHeader>
-            <DialogTitle>Verify Payment</DialogTitle>
+            <DialogTitle className="text-2xl font-black text-slate-900 uppercase tracking-tight">Approve Transaction</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-8 py-6">
             {selectedPayment && (
               <>
-                <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="font-medium">User:</span>
-                      <p>
-                        {selectedPayment.user.firstName ||
-                          selectedPayment.user.username}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Amount:</span>
-                      <p>
-                        {selectedPayment.amountPaid} {selectedPayment.currency}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Bank:</span>
-                      <p>{selectedPayment.manualPaymentData?.bankName}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium">Reference:</span>
-                      <p>
-                        {selectedPayment.manualPaymentData?.referenceNumber}
-                      </p>
-                    </div>
+                <div className="grid grid-cols-2 gap-4 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Buyer</span>
+                    <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{selectedPayment.user.firstName}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</span>
+                    <p className="text-sm font-black text-emerald-600 tracking-tight">{selectedPayment.amountPaid} {selectedPayment.currency}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bank</span>
+                    <p className="text-xs font-bold text-slate-700 uppercase">{selectedPayment.manualPaymentData?.bankName}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ref #</span>
+                    <p className="text-xs font-black text-indigo-500 tracking-tight">{selectedPayment.manualPaymentData?.referenceNumber}</p>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="verificationNotes">Verification Notes</Label>
+                <div className="space-y-3">
+                  <Label htmlFor="verificationNotes" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Internal Verification Notes</Label>
                   <Textarea
                     id="verificationNotes"
                     value={verificationNotes}
                     onChange={(e) => setVerificationNotes(e.target.value)}
-                    placeholder="Add notes about verification..."
+                    placeholder="E.g. Verified via CBE Birr statement..."
+                    className="rounded-2xl border-slate-100 bg-slate-50 font-bold text-slate-700 focus:ring-indigo-500/10 placeholder:text-slate-300"
                     rows={3}
                   />
-                </div>
-
-                <div className="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>
-                    Make sure to check bank statement before verifying
-                  </span>
                 </div>
               </>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-3">
+            <Button variant="ghost" onClick={() => setVerifyDialogOpen(false)} className="h-14 px-8 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400">Cancel</Button>
             <Button
-              variant="outline"
-              onClick={() => setVerifyDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                verifyMutation.mutate({
-                  purchaseId: selectedPayment.id,
-                  notes: verificationNotes,
-                })
-              }
+              onClick={() => verifyMutation.mutate({ purchaseId: selectedPayment.id, notes: verificationNotes })}
               disabled={verifyMutation.isPending}
+              className="h-14 px-10 bg-[#0f172a] text-white hover:bg-emerald-500 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-black/10 flex items-center gap-3"
             >
-              {verifyMutation.isPending ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Verifying...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Confirm Verification
-                </>
-              )}
+              {verifyMutation.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4 text-emerald-400" />}
+              Confirm Approval
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reject Dialog */}
+      {/* Reject Dialog (Consistent with Above) */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rounded-[2.5rem] border-none p-10">
           <DialogHeader>
-            <DialogTitle>Reject Payment</DialogTitle>
+            <DialogTitle className="text-2xl font-black text-slate-900 uppercase tracking-tight">Reject Transaction</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            {selectedPayment && (
-              <>
-                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
-                  <div className="flex items-center gap-2 text-red-600 dark:text-red-400 mb-2">
-                    <AlertCircle className="w-4 h-4" />
-                    <span className="font-medium">Warning</span>
-                  </div>
-                  <p className="text-sm">
-                    Rejecting this payment will mark it as failed. The user will
-                    need to initiate a new purchase.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="rejectReason">Rejection Reason *</Label>
-                  <Textarea
-                    id="rejectReason"
-                    value={verificationNotes}
-                    onChange={(e) => setVerificationNotes(e.target.value)}
-                    placeholder="Explain why the payment is being rejected..."
-                    rows={3}
-                    required
-                  />
-                </div>
-              </>
-            )}
+          <div className="space-y-6 py-6">
+            <div className="p-6 bg-rose-50 rounded-[2rem] border border-rose-100 flex items-start gap-4">
+              <AlertCircle className="w-6 h-6 text-rose-500 shrink-0" />
+              <div>
+                <h4 className="text-sm font-black text-rose-900 uppercase tracking-tight">Critical Action</h4>
+                <p className="text-xs font-medium text-rose-600 leading-relaxed mt-1">Rejecting will void the transaction. The user will be notified and will need to restart the process.</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reason for Rejection *</Label>
+              <Textarea
+                value={verificationNotes}
+                onChange={(e) => setVerificationNotes(e.target.value)}
+                placeholder="E.g. Reference number not found in bank records..."
+                className="rounded-2xl border-rose-100 bg-rose-50/30 font-bold text-slate-700 focus:ring-rose-500/10 placeholder:text-slate-300"
+                rows={3}
+                required
+              />
+            </div>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setRejectDialogOpen(false)}
-            >
-              Cancel
-            </Button>
+          <DialogFooter className="gap-3">
+            <Button variant="ghost" onClick={() => setRejectDialogOpen(false)} className="h-14 px-8 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400">Cancel</Button>
             <Button
               variant="destructive"
-              onClick={() =>
-                rejectMutation.mutate({
-                  purchaseId: selectedPayment.id,
-                  reason: verificationNotes,
-                })
-              }
+              onClick={() => rejectMutation.mutate({ purchaseId: selectedPayment.id, reason: verificationNotes })}
               disabled={rejectMutation.isPending || !verificationNotes.trim()}
+              className="h-14 px-10 bg-rose-600 text-white hover:bg-rose-700 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-rose-600/20 flex items-center gap-3"
             >
-              {rejectMutation.isPending ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Rejecting...
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Confirm Rejection
-                </>
-              )}
+              Confirm Rejection
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -96,4 +96,15 @@ export class AdminController {
   async getStats() {
     return this.adminService.getSystemStats();
   }
+
+  @Get('purchases')
+  async getAllPurchases(
+    @Query('page') page: string,
+    @Query('limit') limit: string,
+  ) {
+    return this.adminService.getAllPurchases(
+      parseInt(page, 10) || 1,
+      parseInt(limit, 10) || 20,
+    );
+  }
 }

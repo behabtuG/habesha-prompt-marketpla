@@ -19,14 +19,17 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const token = authHeader.split(' ')[1];
-
     if (!token) {
       throw new UnauthorizedException('Invalid token format');
     }
 
     try {
       const payload = this.jwtService.verify(token);
-      request.user = payload;
+      // Normalise: controllers use req.user.userId, payload stores it as sub
+      request.user = {
+        ...payload,
+        userId: payload.sub,
+      };
       return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');

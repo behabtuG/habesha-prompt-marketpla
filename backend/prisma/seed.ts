@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import { PrismaClient, UserRole } from '@prisma/client';
 import * as CryptoJS from 'crypto-js';
+import * as bcrypt from 'bcrypt';
 
 // In Prisma 5.9.1, just create PrismaClient normally
 const prisma = new PrismaClient();
@@ -28,34 +29,54 @@ async function main() {
     }
 
     // First, ensure your user exists and is admin
-    console.log(`🛠️  Setting Telegram ID ${YOUR_TELEGRAM_ID} as admin...`);
+    const ADMIN_EMAIL = 'behabtu.getnet@gmail.com';
+    const ADMIN_PHONE = '0921399317';
+    const TG_ID = BigInt(YOUR_TELEGRAM_ID);
+    
+    console.log(`🛠️  Setting ${ADMIN_EMAIL} as admin...`);
 
-    const adminUser = await prisma.user.upsert({
-      where: { telegramId: BigInt(YOUR_TELEGRAM_ID) },
-      update: {
-        username: 'begetm',
-        firstName: 'Behabtu',
-        isAdmin: true,
-        role: UserRole.ADMIN,
-        telegramData: {
-          id: YOUR_TELEGRAM_ID,
-          first_name: 'Behabtu',
-          username: 'begetm',
-        },
-      },
-      create: {
-        telegramId: BigInt(YOUR_TELEGRAM_ID),
-        username: 'begetm',
-        firstName: 'Behabtu',
-        isAdmin: true,
-        role: UserRole.ADMIN,
-        telegramData: {
-          id: YOUR_TELEGRAM_ID,
-          first_name: 'Behabtu',
-          username: 'begetm',
-        },
-      },
+    // Check if user exists by email OR telegramId to avoid P2002 conflicts
+    const existingAdmin = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: ADMIN_EMAIL },
+          { telegramId: TG_ID }
+        ]
+      }
     });
+
+    let adminUser;
+    const adminData = {
+      email: ADMIN_EMAIL,
+      username: 'begetm',
+      firstName: 'Behabtu',
+      lastName: 'Getnet',
+      phoneNumber: ADMIN_PHONE,
+      passwordHash: await bcrypt.hash('Admin@123', 12),
+      isAdmin: true,
+      role: UserRole.ADMIN,
+      authProvider: 'BOTH',
+      telegramId: TG_ID,
+      telegramData: {
+        id: YOUR_TELEGRAM_ID,
+        first_name: 'Behabtu',
+        last_name: 'Getnet',
+        username: 'begetm',
+      },
+    } as any;
+
+    if (existingAdmin) {
+      console.log('📝 Updating existing admin account...');
+      adminUser = await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: adminData,
+      });
+    } else {
+      console.log('📝 Creating new admin account...');
+      adminUser = await prisma.user.create({
+        data: adminData,
+      });
+    }
 
     console.log('✅ Admin user set!');
 

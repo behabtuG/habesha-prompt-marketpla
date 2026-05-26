@@ -104,11 +104,16 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Param,
   Query,
   UseGuards,
   Request,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { PromptsService } from './prompts.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { JwtService } from '@nestjs/jwt';
@@ -164,6 +169,23 @@ export class PromptsController {
     });
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('created')
+  async getCreatedPrompts(@Request() req) {
+    return this.promptsService.findCreated(req.user.sub);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('purchased')
+  async findPurchased(@Request() req, @Query() query: GetPromptsQueryDto) {
+    return this.promptsService.findPurchased(req.user.sub, {
+      category: query.category,
+      search: query.search,
+      limit: query.limit,
+      page: query.page,
+    });
+  }
+
   @Get('categories')
   async getCategories() {
     return this.promptsService.getCategories();
@@ -181,14 +203,20 @@ export class PromptsController {
     return this.promptsService.getFullPrompt(req.user.sub, id);
   }
 
+
+
   @UseGuards(JwtAuthGuard)
-  @Get('purchased')
-  async findPurchased(@Request() req, @Query() query: GetPromptsQueryDto) {
-    return this.promptsService.findPurchased(req.user.sub, {
-      category: query.category,
-      search: query.search,
-      limit: query.limit,
-      page: query.page,
+  @Post()
+  @UseInterceptors(FileInterceptor('image'))
+  async submitPrompt(
+    @Body() body: any,
+    @Request() req,
+    @UploadedFile() image?: Express.Multer.File,
+  ) {
+    return this.promptsService.submitPrompt({
+      ...body,
+      creatorId: req.user.sub,
+      imageFile: image,
     });
   }
 }

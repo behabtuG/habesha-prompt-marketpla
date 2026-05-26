@@ -20,6 +20,7 @@ export class MediaService {
 
   async uploadFile(
     file: Express.Multer.File,
+    folder: string = 'prompts',
   ): Promise<{ fileName: string; filePath: string; url: string }> {
     try {
       console.log('📤 [MediaService] Starting file upload...');
@@ -35,14 +36,15 @@ export class MediaService {
 
       // 2. Generate unique filename
       const fileName = this.generateFileName(file.originalname);
-      const filePath = path.join(this.uploadDir, fileName);
+      const targetDir = path.resolve(process.cwd(), 'uploads', folder);
+      const filePath = path.join(targetDir, fileName);
 
       console.log('📤 Generated file name:', fileName);
       console.log('📤 File path:', filePath);
-      console.log('📤 Upload directory:', this.uploadDir);
+      console.log('📤 Upload directory:', targetDir);
 
       // 3. Ensure directory exists
-      await this.ensureUploadDir();
+      await this.ensureDirExists(targetDir);
 
       // 4. Save file to disk
       await fs.writeFile(filePath, file.buffer);
@@ -52,20 +54,31 @@ export class MediaService {
       console.log('📤 File saved successfully:', {
         size: savedStats.size,
         path: filePath,
-        url: `/uploads/prompts/${fileName}`,
+        url: `/uploads/${folder}/${fileName}`,
       });
 
       // 5. Return file info
       return {
         fileName,
         filePath,
-        url: `/uploads/prompts/${fileName}`,
+        url: `/uploads/${folder}/${fileName}`,
       };
     } catch (error) {
       console.error('❌ [MediaService] Upload failed:', error);
       throw new InternalServerErrorException(
         `Failed to upload file: ${error.message}`,
       );
+    }
+  }
+
+  /**
+   * Helper to ensure custom folder directory exists
+   */
+  private async ensureDirExists(dir: string): Promise<void> {
+    try {
+      await fs.access(dir);
+    } catch {
+      await fs.mkdir(dir, { recursive: true });
     }
   }
 

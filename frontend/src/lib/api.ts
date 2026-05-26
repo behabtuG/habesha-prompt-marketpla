@@ -4,7 +4,7 @@ import axios from "axios";
 
 // Ensure this matches your backend EXACTLY (http://localhost:4060/api)
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:4060/api",
 });
 
 api.interceptors.request.use(

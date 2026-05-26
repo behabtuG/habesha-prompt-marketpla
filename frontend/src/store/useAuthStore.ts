@@ -4,14 +4,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-interface User {
+export interface User {
   id: string;
-  telegramId: string;
+  telegramId?: string | null;
+  email?: string | null;
   username?: string;
   firstName?: string;
+  lastName?: string;
+  avatarUrl?: string | null;
   balanceStars: number;
   isAdmin: boolean;
   totalSpent: number;
+  authProvider?: "TELEGRAM" | "EMAIL" | "BOTH";
+  emailVerified?: boolean;
+  hasTelegram?: boolean;
+  hasEmail?: boolean;
 }
 
 interface AuthState {
@@ -21,6 +28,7 @@ interface AuthState {
   setAuth: (token: string, user: User) => void;
   logout: () => void;
   updateBalance: (newBalance: number) => void;
+  updateUser: (updates: Partial<User>) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -36,6 +44,8 @@ export const useAuthStore = create<AuthState>()(
             ...user,
             balanceStars: user.balanceStars || 0,
             totalSpent: user.totalSpent || 0,
+            hasTelegram: !!user.telegramId,
+            hasEmail: !!user.email,
           },
           isAuthenticated: true,
         }),
@@ -44,10 +54,13 @@ export const useAuthStore = create<AuthState>()(
         set((state) => ({
           user: state.user ? { ...state.user, balanceStars: newBalance } : null,
         })),
+      updateUser: (updates) =>
+        set((state) => ({
+          user: state.user ? { ...state.user, ...updates } : null,
+        })),
     }),
     {
       name: "prompt-marketplace-auth",
-      skipHydration: true,
     }
   )
 );

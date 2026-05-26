@@ -1,11 +1,11 @@
 {
   "name": "telegram-bot",
   "version": "1.0.0",
-  "main": "dist/index.js",
+  "type": "module",
   "scripts": {
     "setup": "tsx src/setup.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "dev:https": "npm run ngrok && npm run dev",
     "ngrok": "tsx scripts/setup-ngrok.ts",

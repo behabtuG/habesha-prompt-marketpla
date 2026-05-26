@@ -8,10 +8,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Add these enums
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
 enum UserRole {
   USER
   ADMIN
+}
+
+/// How the user originally authenticated
+enum AuthProvider {
+  TELEGRAM  // Mini-App only
+  EMAIL     // Web registration only
+  GOOGLE    // Google Sign-in
+  BOTH      // Telegram + email linked
 }
 
 enum PurchaseStatus {
@@ -44,12 +53,37 @@ enum SubscriptionTier {
   ULTIMATE
 }
 
+// ─── Models ───────────────────────────────────────────────────────────────────
+
 model User {
-  id           String   @id @default(cuid())
-  telegramId   BigInt   @unique
+  id         String  @id @default(cuid())
+
+  // ── Telegram identity (optional – web users start without this) ──────────
+  telegramId   BigInt?  @unique
   username     String?  @unique
+  telegramData Json?
+
+  // ── Web identity (optional – Telegram-only users start without this) ─────
+  email            String?  @unique
+  passwordHash     String?
+  emailVerified    Boolean  @default(false)
+  emailVerifyToken String?  // short-lived token for email confirmation
+  passwordResetToken String?
+  passwordResetExpiry DateTime?
+
+  // ── Link token: used by bot deep-link to connect Telegram → web account ──
+  linkToken        String?  @unique
+
+  googleId         String?  @unique
+
+  // ── Auth provider tracking ────────────────────────────────────────────────
+  authProvider     AuthProvider @default(TELEGRAM)
+
+  // ── Profile ───────────────────────────────────────────────────────────────
   firstName    String?
   lastName     String?
+  avatarUrl    String?
+  phoneNumber  String?  @unique
   role               UserRole           @default(USER)
   isAdmin            Boolean            @default(false)
   balanceStars       Int                @default(0)
@@ -58,8 +92,7 @@ model User {
   subscriptionTier   SubscriptionTier   @default(FREE)
   subscriptionExpiresAt DateTime?
   categoryCredits    Json?
-  lastCreditRefresh  DateTime?         @default(now())
-  telegramData       Json?
+  lastCreditRefresh  DateTime?          @default(now())
   metadata           Json?
 
   purchases          Purchase[]
@@ -72,6 +105,9 @@ model User {
 
   @@index([telegramId])
   @@index([username])
+  @@index([email])
+  @@index([linkToken])
+  @@index([googleId])
 }
 
 model Prompt {

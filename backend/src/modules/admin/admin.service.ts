@@ -265,6 +265,7 @@ export class AdminService {
       priceLocal?: number | string;
       imageFile?: Express.Multer.File;
       imageAlt?: string;
+      isActive?: boolean;
     },
   ) {
     // 1. Find existing prompt
@@ -298,6 +299,10 @@ export class AdminService {
     }
 
     if (data.imageAlt !== undefined) updateData.imageAlt = data.imageAlt;
+    // Ensure isActive is a boolean
+    if (data.isActive !== undefined) {
+      updateData.isActive = typeof data.isActive === 'string' ? data.isActive === 'true' : !!data.isActive;
+    }
 
     // 4. Encrypt full content if provided OR decrypt if price changed to 0
     const finalPriceStars =
@@ -468,10 +473,10 @@ export class AdminService {
 
       console.log('🔍 [ADMIN] Paginated users found:', users.length);
 
-      // FIX: Convert BigInt telegramId to string
+      // FIX: Convert BigInt telegramId to string (with null safety)
       const usersWithStringIds = users.map((user) => ({
         ...user,
-        telegramId: user.telegramId.toString(), // Convert BigInt to string
+        telegramId: user.telegramId ? user.telegramId.toString() : 'N/A',
       }));
 
       console.log('🔍 [ADMIN] After conversion:', usersWithStringIds);
@@ -533,5 +538,47 @@ export class AdminService {
         activePrompts,
       },
     };
+  }
+
+  // --- PURCHASE MANAGEMENT ---
+  async getAllPurchases(page = 1, limit = 20) {
+    try {
+      console.log('🔍 [ADMIN] getAllPurchases called:', { page, limit });
+      const skip = (page - 1) * limit;
+
+      const [purchases, total] = await Promise.all([
+        this.prisma.purchase.findMany({
+          skip,
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                username: true,
+              },
+            },
+            prompt: {
+              select: {
+                id: true,
+                title: true,
+                priceStars: true,
+              },
+            },
+          },
+        }),
+        this.prisma.purchase.count(),
+      ]);
+
+      return {
+        success: true,
+        data: purchases,
+        meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+      };
+    } catch (error) {
+      console.error('❌ [ADMIN] Error in getAllPurchases:', error);
+      throw new InternalServerErrorException('Failed to fetch purchases');
+    }
   }
 }

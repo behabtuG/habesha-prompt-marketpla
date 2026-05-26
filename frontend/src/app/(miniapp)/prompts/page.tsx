@@ -159,15 +159,19 @@ export default function PromptsPage() {
         <>
           {/* Prompts Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {prompts.map((prompt: any) => (
-              <PromptCard
-                key={prompt.id}
-                prompt={{
-                  ...prompt,
-                  hasAccess: prompt.hasAccess || false,
-                }}
-              />
-            ))}
+            {prompts.map((prompt: any) => {
+              const isCreator = user && (prompt.creator?.id === user.id || prompt.creatorId === user.id);
+              return (
+                <PromptCard
+                  key={prompt.id}
+                  prompt={{
+                    ...prompt,
+                    hasAccess: prompt.hasAccess || isCreator || false,
+                    isCreator: !!isCreator,
+                  }}
+                />
+              );
+            })}
           </div>
 
           {/* Pagination */}

@@ -5,10 +5,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { MediaModule } from '../media/media.module';
 
 @Global() // Make it globally available
 @Module({
   imports: [
+    MediaModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

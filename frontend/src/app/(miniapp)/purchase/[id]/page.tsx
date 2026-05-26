@@ -166,17 +166,6 @@ export default function PurchasePage() {
             setPaymentStep("init");
           });
           break;
-
-        // case "TON":
-        //   setPaymentStep("redirect");
-        //   toast.info("Please complete payment in your TON wallet");
-
-        //   // Start polling for payment confirmation
-        //   startStatusPolling(purchaseData.purchaseId);
-        //   break;
-        // app/(miniapp)/purchase/[id]/page.tsx
-        // Update the TON payment handling
-
         case "TON":
           setPaymentStep("redirect");
           toast.info("Please complete payment in your TON wallet");

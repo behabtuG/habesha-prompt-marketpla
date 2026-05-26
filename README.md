@@ -103,7 +103,8 @@ cd telegram-prompt-marketplace
 
 # Start HTTPS tunnel for Telegram
 
-- ngrok http 3000
+- cd frontend 
+- npx localtunnel --port 3000 --subdomain habeshaprompt
 
 # Start Backend
 

@@ -1,259 +1,180 @@
 // app/(miniapp)/layout.tsx
 "use client";
 
-import { useTelegramInit } from "@/lib/telegram";
 import { useAuthStore } from "@/store/useAuthStore";
-import { useEffect, useState } from "react";
-import api from "@/lib/api";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
-import { Link as LucideLink, ShieldCheck, Sparkles, WifiOff } from "lucide-react";
+import {
+  MoreHorizontal,
+  ShieldCheck,
+  User as UserIcon,
+  Settings,
+  Bookmark,
+  ShoppingBag,
+  LogOut,
+  Users,
+  Share2,
+  ChevronDown
+} from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useOutsideClick } from "@/hooks/useOutsideClick";
 import { Button } from "@/components/ui/button";
-import { AdminBanner } from "@/components/admin/AdminBanner";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5,
-    },
-  },
-});
+import { usePathname } from "next/navigation";
+import { toast } from "sonner";
 
 export default function MiniAppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { initData, isLoading: telegramLoading } = useTelegramInit();
-  const { setAuth, isAuthenticated, user, logout } = useAuthStore();
-  const [apiError, setApiError] = useState<string | null>(null);
-  const [isCheckingApi, setIsCheckingApi] = useState(true);
 
-  // Check API health on mount
+  const { isAuthenticated, user, logout } = useAuthStore();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Handle hydration
   useEffect(() => {
-    const checkApiHealth = async () => {
-      try {
-        setIsCheckingApi(true);
-        await api.get("/health");
-        setApiError(null);
-      } catch (error: any) {
-        console.error("API health check failed:", error);
-        setApiError(
-          error.message ||
-            "Cannot connect to backend. Please check if the server is running."
-        );
-      } finally {
-        setIsCheckingApi(false);
-      }
-    };
-
-    checkApiHealth();
+    setMounted(true);
   }, []);
 
-  // Auto-login using Telegram initData
-  useEffect(() => {
-    const authenticate = async () => {
-      if (initData && !isAuthenticated) {
-        try {
-          console.log("🔐 Attempting Telegram authentication...");
+  // Use the custom hook for both menus
+  useOutsideClick(menuRef, () => setIsMenuOpen(false));
+  useOutsideClick(profileMenuRef, () => setIsProfileMenuOpen(false));
 
-          const response = await api.post(
-            "/auth/telegram",
-            {},
-            {
-              headers: {
-                "x-telegram-init-data": initData,
-              },
-            }
-          );
 
-          const { access_token, user: userData } = response.data;
+  const handleLogout = () => {
+    logout();
+    setIsProfileMenuOpen(false);
+    toast.success("Safe logout completed");
+  };
 
-          // DEBUG: Log what the backend returns
-          console.log("🔍 Backend returned user data:", userData);
-          console.log("🔍 Is admin?", userData.isAdmin);
-
-          setAuth(access_token, userData);
-
-          console.log("✅ Authentication successful:", userData.username);
-        } catch (error: any) {
-          console.error("❌ Telegram authentication failed:", error);
-          console.error("Error details:", error.response?.data);
-
-          // For development, create a mock user WITH ADMIN FLAG
-          if (process.env.NODE_ENV === "development") {
-            console.warn("⚠️ Development mode: Creating mock user WITH ADMIN");
-            const mockUser = {
-              id: "dev-user-id",
-              telegramId: "361650959", // Use your actual Telegram ID
-              username: "begetm",
-              firstName: "Behabtu",
-              balanceStars: 1000,
-              isAdmin: true, // IMPORTANT: Set this to true
-              totalSpent: 0,
-            };
-            const mockToken = "dev-mock-token";
-            setAuth(mockToken, mockUser);
-          }
-        }
-      }
-    };
-
-    authenticate();
-  }, [initData, isAuthenticated, setAuth]);
-
-  // Show loading while checking API
-  if (isCheckingApi || telegramLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">
-            {telegramLoading
-              ? "Loading Telegram Mini App..."
-              : "Checking connection..."}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show API error if cannot connect
-  if (apiError) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center">
-          <div className="mx-auto w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mb-4">
-            <WifiOff className="h-8 w-8 text-destructive" />
-          </div>
-          <h1 className="text-2xl font-bold mb-2">Connection Error</h1>
-          <p className="text-muted-foreground mb-4">{apiError}</p>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Make sure your backend server is running:
-            </p>
-            <div className="bg-muted p-3 rounded text-sm font-mono text-left">
-              <div>cd backend</div>
-              <div>npm run dev</div>
-            </div>
-            <Button onClick={() => window.location.reload()} className="w-full">
-              Retry Connection
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const pathname = usePathname();
+  const isAdminPage = pathname?.startsWith("/admin");
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-background text-foreground">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4">
-          <div className="max-w-6xl mx-auto">
-            {/* Top row with logo and user */}
-            <div className="flex justify-between items-center mb-2">
-              <Link
-                href="/"
-                className="hover:opacity-90 flex items-center gap-2"
-              >
-                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                  <span className="font-bold">⚡</span>
-                </div>
-                <h1 className="text-xl font-bold">Prompt Marketplace</h1>
-              </Link>
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-yellow-200 relative">
+      {!isAdminPage && (
+        <div className="absolute top-8 left-0 right-0 z-50 px-6 flex justify-center">
+          <header className="w-full max-w-6xl h-16 bg-white border border-slate-200/60 rounded-full px-8 flex items-center justify-between shadow-[0_20px_50px_rgba(0,0,0,0.15)] transition-all">
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-400" />
+              <span className="text-xs font-black tracking-[0.2em] uppercase">Habesha PROMPTS</span>
+            </Link>
 
-              {user && (
-                <div className="flex items-center gap-3">
-                  {/* DEBUG: Always show admin status */}
-                  <div className="flex items-center gap-3">
-                    {user.isAdmin && (
-                      <Link href="/admin">
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500 text-black rounded-lg font-semibold text-sm hover:bg-yellow-400 transition-colors cursor-pointer animate-pulse">
-                          <ShieldCheck className="h-3.5 w-3.5" />
-                          <span>ADMIN</span>
-                        </div>
-                      </Link>
-                    )}
+            <nav className="hidden lg:flex items-center gap-10">
+              <Link href="/" className="text-[13px] font-bold text-slate-500 hover:text-slate-900 transition-colors">Home</Link>
+              <Link href="/prompts?category=Images" className="text-[13px] font-bold text-slate-500 hover:text-slate-900 transition-colors">Images</Link>
+              <Link href="/prompts?category=Code" className="text-[13px] font-bold text-slate-500 hover:text-slate-900 transition-colors">Code</Link>
+              <Link href="/prompts?category=Business" className="text-[13px] font-bold text-slate-500 hover:text-slate-900 transition-colors">Business</Link>
+            </nav>
 
-                    <div className="flex items-center gap-2">
-                      {/* Subscription Status/Upgrade */}
-                      <Link href="/subscriptions">
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-semibold mr-1 transition-colors cursor-pointer border border-white/20">
-                          <Sparkles className="h-3 w-3" />
-                          <span>UPGRADE</span>
-                        </div>
-                      </Link>
-
-                      <div className="text-right hidden sm:block">
-                        <div className="font-medium text-sm">
-                          {user.firstName || user.username}
-                        </div>
-                        <div className="text-xs opacity-80 flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" />
-                          {user.balanceStars} Stars
-                        </div>
-                      </div>
-                      <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                        <span className="font-bold">
-                          {user.firstName?.charAt(0) ||
-                            user.username?.charAt(0) ||
-                            "U"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+            <div className="flex items-center gap-4">
+              {mounted && user?.isAdmin && (
+                <Link href="/admin" className="hidden sm:flex items-center gap-2 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-full group hover:bg-indigo-600 transition-all active:scale-95">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600 group-hover:text-white transition-colors" />
+                  <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest group-hover:text-white transition-colors">Admin Hub</span>
+                </Link>
               )}
-            </div>
 
-            {/* Bottom bar with admin info */}
-            {/* {user && user.isAdmin && (
-              <div className="mt-2 pt-2 border-t border-white/20 animate-fadeIn">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs">
-                    <ShieldCheck className="h-3 w-3 text-yellow-300" />
-                    <span className="font-semibold">
-                      Administrator Access Active
-                    </span>
-                    <span className="opacity-80">
-                      • Telegram ID: {user.telegramId}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href="/debug"
-                      className="text-xs hover:underline opacity-80"
-                    >
-                      Debug
-                    </Link>
-                    <Link
-                      href="/admin"
-                      className="text-xs bg-white/20 px-2 py-1 rounded hover:bg-white/30"
-                    >
-                      Open Admin Panel →
-                    </Link>
-                  </div>
+              {mounted && !isAuthenticated && (
+                <Link href="/auth">
+                  <Button className="h-10 px-6 bg-slate-900 text-white hover:bg-black rounded-full text-xs font-bold transition-all active:scale-95">Login / Register</Button>
+                </Link>
+              )}
+
+              <div className="flex items-center gap-3 relative">
+                {/* General Menu Toggle (Three Dots) */}
+                <div className="relative" ref={menuRef}>
+                  <button
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all border active:scale-95 group ${isMenuOpen ? 'bg-slate-100 border-slate-200 text-slate-900' : 'hover:bg-slate-50 border-slate-100 text-slate-400'}`}
+                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                  >
+                    <MoreHorizontal className="w-5 h-5" />
+                  </button>
+
+                  {isMenuOpen && (
+                    <div className="absolute top-12 right-0 w-64 bg-white/95 backdrop-blur-2xl border border-slate-100 rounded-[2rem] py-4 shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-[60] animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                      {user?.isAdmin && (
+                        <>
+                          <Link href="/admin" className="flex items-center gap-3 px-6 py-3 text-sm font-black text-indigo-600 hover:bg-indigo-50 transition-all" onClick={() => setIsMenuOpen(false)}>
+                            <ShieldCheck className="w-4 h-4" /> Admin Hub
+                          </Link>
+                          <div className="h-px bg-slate-100 my-3 mx-6" />
+                        </>
+                      )}
+
+                      <Link href="/bookmarks" className="flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all" onClick={() => setIsMenuOpen(false)}>
+                        <Bookmark className="w-4 h-4 text-indigo-500" /> Bookmarks
+                      </Link>
+
+                      <Link href="/community" className="flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all" onClick={() => setIsMenuOpen(false)}>
+                        <Users className="w-4 h-4 text-slate-400" /> Community
+                      </Link>
+                      <Link href="/share" className="flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all" onClick={() => setIsMenuOpen(false)}>
+                        <Share2 className="w-4 h-4 text-slate-400" /> Share a Prompt
+                      </Link>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )} */}
-          </div>
-        </div>
-        <AdminBanner />
-        {/* Main Content */}
-        <main className="max-w-6xl mx-auto p-4">{children}</main>
-        {/* Footer */}
-        <footer className="border-t p-4 text-center text-sm text-muted-foreground">
-          <p>
-            Powered by Telegram Web Apps • Secure payments with Telegram Stars
-          </p>
-        </footer>
-      </div>
 
+                {/* Identity Menu Toggle (Profile Icon) */}
+                {mounted && isAuthenticated && (
+                  <div className="relative" ref={profileMenuRef}>
+                    <button
+                      onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                      className={`h-10 px-3 pr-4 rounded-full bg-slate-50 border transition-all active:scale-95 flex items-center gap-2 group ${isProfileMenuOpen ? 'border-indigo-200 bg-indigo-50' : 'border-slate-100 hover:bg-slate-100'}`}
+                    >
+                      <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase group-hover:bg-indigo-500 group-hover:text-white transition-all">
+                        {user ? (user.firstName?.slice(0, 2) || user.username?.slice(0, 2)) : "US"}
+                      </div>
+                      <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${isProfileMenuOpen ? 'rotate-180 text-indigo-500' : ''}`} />
+                    </button>
+
+                    {isProfileMenuOpen && (
+                      <div className="absolute top-12 right-0 w-64 bg-white/95 backdrop-blur-2xl border border-slate-100 rounded-[2rem] py-4 shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-[60] animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                        <div className="px-6 py-3 mb-2">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Identity</p>
+                          <p className="text-sm font-black text-slate-900 truncate">{user?.firstName || user?.username}</p>
+                        </div>
+                        <div className="h-px bg-slate-100 mb-2 mx-6" />
+
+                        <Link href="/profile" className="flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all" onClick={() => setIsProfileMenuOpen(false)}>
+                          <UserIcon className="w-4 h-4 text-indigo-500" /> Profile
+                        </Link>
+                        <Link href="/my-prompts" className="flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all" onClick={() => setIsProfileMenuOpen(false)}>
+                          <ShoppingBag className="w-4 h-4 text-indigo-500" /> My Prompts
+                        </Link>
+                        <Link href="/settings" className="flex items-center gap-3 px-6 py-3 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all" onClick={() => setIsProfileMenuOpen(false)}>
+                          <Settings className="w-4 h-4 text-indigo-500" /> Settings
+                        </Link>
+
+                        <div className="h-px bg-slate-100 my-3 mx-6" />
+                        <button onClick={handleLogout} className="w-full flex items-center gap-3 px-6 py-3 text-sm font-bold text-rose-500 hover:bg-rose-50 transition-all text-left">
+                          <LogOut className="w-4 h-4" /> Logout
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+        </div>
+      )}
+
+      <main className={isAdminPage ? "w-full" : "max-w-6xl mx-auto p-4 pt-32"}>
+        {children}
+      </main>
+
+      {!isAdminPage && (
+        <footer className="border-t p-4 text-center text-sm text-muted-foreground mt-20">
+          <p>Powered by Telegram Web Apps • Secure payments with Telegram Stars</p>
+        </footer>
+      )}
       <Toaster position="top-center" richColors closeButton />
-    </QueryClientProvider>
+    </div>
   );
 }

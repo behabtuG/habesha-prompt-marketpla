@@ -58,77 +58,82 @@ export default function UsersPage() {
   const users = usersData?.data || [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">Manage Users</h2>
-        <p className="text-muted-foreground">
-          View and manage all registered users
-        </p>
-      </div>
-
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       {usersLoading ? (
-        <div className="text-center py-12">
-          <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p>Loading users...</p>
-        </div>
+        <Card className="border-none shadow-sm p-20 flex flex-col items-center justify-center">
+          <RefreshCw className="w-10 h-10 animate-spin text-yellow-500 mb-4" />
+          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Loading Records...</p>
+        </Card>
       ) : (
-        <Card>
+        <Card className="border-none shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Telegram ID</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Balance</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead>Actions</TableHead>
+              <TableHeader className="bg-slate-50">
+                <TableRow className="border-none hover:bg-transparent">
+                  <TableHead className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-6 py-5">Administrator / User</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-6 py-5">Account ID</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-6 py-5">Privileges</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-6 py-5">Wallet (Stars)</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-6 py-5">Registration Date</TableHead>
+                  <TableHead className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 px-6 py-5 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {users.map((userItem: any) => (
-                  <TableRow key={userItem.id}>
-                    <TableCell>
-                      <div className="font-medium">
-                        {userItem.firstName || userItem.username || "Anonymous"}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        @{userItem.username || "no-username"}
+                  <TableRow key={userItem.id} className="group hover:bg-slate-50/50 transition-colors border-slate-100">
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 border border-slate-200">
+                           {userItem.firstName?.slice(0, 2).toUpperCase() || "UN"}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-slate-800">
+                            {userItem.firstName || userItem.username || "Anonymous"}
+                          </span>
+                          <span className="text-[10px] font-medium text-slate-400">
+                            @{userItem.username || "no-username"}
+                          </span>
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <code className="text-xs">{userItem.telegramId}</code>
+                    <TableCell className="px-6 py-4">
+                      <code className="text-[10px] font-bold bg-slate-100 px-2 py-1 rounded text-slate-500 uppercase tracking-tight">{userItem.telegramId}</code>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-6 py-4">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs ${
+                        className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
                           userItem.isAdmin
-                            ? "bg-purple-100 text-purple-700"
-                            : "bg-gray-100 text-gray-700"
+                            ? "bg-amber-100 text-amber-700 border border-amber-200"
+                            : "bg-slate-100 text-slate-600 border border-slate-200"
                         }`}
                       >
-                        {userItem.isAdmin ? "Admin" : "User"}
+                        {userItem.isAdmin ? "Admin" : "Standard"}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-yellow-500" />
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-500" />
                         <span>{userItem.balanceStars}</span>
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {new Date(userItem.createdAt).toLocaleDateString()}
+                    <TableCell className="px-6 py-4 text-[11px] font-bold text-slate-500">
+                      {new Date(userItem.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-6 py-4 text-right">
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() =>
                           handleToggleUserRole(userItem.id, userItem.isAdmin)
                         }
+                        className={`h-8 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                           userItem.isAdmin 
+                             ? "text-rose-500 hover:bg-rose-50" 
+                             : "text-indigo-500 hover:bg-indigo-50"
+                        }`}
                         disabled={updateUserRoleMutation.isPending}
                       >
-                        {userItem.isAdmin ? "Demote" : "Promote"}
+                        {userItem.isAdmin ? "Revoke" : "Authorize"}
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -4,11 +4,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import api from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Lock, CheckCircle, Clock } from "lucide-react";
+import { ArrowLeft, Copy, Heart, Bookmark, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { getImageUrl } from "@/lib/image-utils";
 
 export default function FullPromptPage() {
   const params = useParams();
@@ -19,44 +18,59 @@ export default function FullPromptPage() {
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [purchaseStatus, setPurchaseStatus] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   useEffect(() => {
-    checkAccess();
-    loadPrompt();
+    fetchData();
   }, [promptId]);
 
-  const checkAccess = async () => {
+  const fetchData = async () => {
     try {
-      const response = await api.get(`/payments/check-access/${promptId}`);
-      const data = response.data;
+      // 1. Get basic info first
+      const previewRes = await api.get(`/prompts/${promptId}`);
+      const promptData = previewRes.data.data;
 
-      setHasAccess(data.hasAccess);
-      setPurchaseStatus(data.purchaseStatus || null);
+      let accessGranted = false;
 
-      if (!data.hasAccess && data.canPurchase) {
-        router.push(`/prompts/${promptId}`);
+      // 2. Check if it's free or user has purchased
+      if (promptData.priceStars === 0) {
+        accessGranted = true;
+        setHasAccess(true);
+      } else {
+        try {
+          const accessRes = await api.get(`/payments/check-access/${promptId}`);
+          accessGranted = accessRes.data.hasAccess;
+          setHasAccess(accessGranted);
+          setPurchaseStatus(accessRes.data.purchaseStatus || null);
+        } catch (err) {
+          console.error("Access check error:", err);
+        }
       }
-    } catch (error: any) {
-      console.error("Access check error:", error);
-      toast.error("Failed to check access");
-      router.push(`/prompts/${promptId}`);
-    }
-  };
 
-  const loadPrompt = async () => {
-    try {
-      const [previewRes, fullRes] = await Promise.all([
-        api.get(`/prompts/${promptId}`),
-        api.get(`/prompts/${promptId}/full`),
-      ]);
+      // 3. If no access, redirect to preview/purchase
+      if (!accessGranted) {
+        router.push(`/prompts/${promptId}`);
+        return;
+      }
+
+      // 4. Try fetching full content
+      let fullContent = promptData.decryptedContent || promptData.description;
+      try {
+        const fullRes = await api.get(`/prompts/${promptId}/full`);
+        fullContent = fullRes.data?.data?.content || fullContent;
+      } catch (err) {
+        console.warn("Could not fetch full content from backend, using fallback");
+      }
 
       setPrompt({
-        ...previewRes.data.data,
-        fullContent: fullRes.data.data.content,
+        ...promptData,
+        fullContent,
       });
-    } catch (err) {
-      toast.error("Failed to load full prompt");
-      router.push(`/prompts/${promptId}`);
+
+    } catch (error) {
+      console.error("Error loading prompt:", error);
+      toast.error("Failed to load prompt");
+      router.push("/");
     } finally {
       setLoading(false);
     }
@@ -64,164 +78,145 @@ export default function FullPromptPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
       </div>
     );
   }
 
-  if (!prompt) return null;
+  if (!prompt || !hasAccess) return null;
 
-  if (!hasAccess) {
-    return (
-      <div className="max-w-2xl mx-auto p-4">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Lock className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
-            </div>
+  const imageSrc = getImageUrl(prompt.imageUrl);
+  const formattedDate = new Date(prompt.createdAt || Date.now()).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
-            <h1 className="text-2xl font-bold mb-2">Access Restricted</h1>
-
-            {purchaseStatus === "PENDING_VERIFICATION" ? (
-              <>
-                <div className="flex items-center gap-2 justify-center text-yellow-600 dark:text-yellow-400 mb-4">
-                  <Clock className="w-5 h-5" />
-                  <span className="font-medium">
-                    Payment Pending Verification
-                  </span>
-                </div>
-                <p className="text-muted-foreground mb-6">
-                  Your payment is being verified by our team. This usually takes
-                  1-24 hours. You'll get access automatically once verified.
-                </p>
-                <div className="space-y-3">
-                  <Button onClick={() => router.push(`/prompts/${promptId}`)}>
-                    View Prompt Details
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push("/my-prompts")}
-                  >
-                    Check My Purchases
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-muted-foreground mb-6">
-                  You need to purchase this prompt to access the full content.
-                </p>
-                <div className="space-y-3">
-                  <Button onClick={() => router.push(`/prompts/${promptId}`)}>
-                    Purchase Prompt
-                  </Button>
-                  <Button variant="outline" onClick={() => router.push("/")}>
-                    Browse More Prompts
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const handleCopy = () => {
+    navigator.clipboard.writeText(prompt.fullContent);
+    setIsCopied(true);
+    toast.success("Prompt copied to clipboard!");
+    setTimeout(() => setIsCopied(false), 2000);
+  };
 
   return (
-    <div className="max-w-4xl mx-auto p-4">
-      {/* Back Navigation */}
-      <div className="mb-6">
-        <Link href={`/prompts/${promptId}`}>
-          <Button variant="ghost" size="sm" className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Preview
-          </Button>
-        </Link>
-      </div>
+    <div className="min-h-screen bg-slate-50 text-slate-900 pb-12">
+      <div className="max-w-7xl mx-auto p-4 md:p-8">
 
-      <Card>
-        <CardContent className="p-6 space-y-6">
-          {/* Access Badge */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-2xl font-bold">{prompt.title}</h1>
-              <p className="text-muted-foreground">{prompt.description}</p>
-            </div>
-            <div className="flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-3 py-2 rounded-lg">
-              <CheckCircle className="w-4 h-4" />
-              <span className="font-medium">You have access</span>
+        {/* Back Navigation */}
+        <div className="mb-6 md:mb-10">
+          <Link href="/">
+            <button className="flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium text-sm transition-colors">
+              <ArrowLeft className="w-4 h-4" />
+              Back to gallery
+            </button>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-8 md:gap-12 lg:gap-16">
+
+          {/* LEFT: Image */}
+          <div className="w-full">
+            <div className="relative w-full aspect-square md:aspect-[4/5] rounded-[2rem] overflow-hidden shadow-2xl bg-slate-900">
+              {imageSrc ? (
+                <img
+                  src={imageSrc}
+                  alt={prompt.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+                  <span className="text-slate-500 font-medium">No image available</span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Full Content */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Full Prompt Content</h2>
-            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-6 border">
-              <pre className="text-foreground whitespace-pre-wrap leading-relaxed font-sans">
+          {/* RIGHT: Content */}
+          <div className="flex flex-col pt-2 md:pt-4">
+
+            {/* Header Info */}
+            <div className="mb-8">
+              <div className="inline-block bg-slate-900 text-white text-[10px] sm:text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full mb-5 shadow-md">
+                PROMPT DETAIL
+              </div>
+
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-slate-900 leading-tight mb-4">
+                {prompt.title}
+              </h1>
+
+              <div className="text-slate-500 text-sm md:text-base font-medium space-y-1">
+                <p>Shared by <span className="text-slate-600">@{prompt.creator?.username || 'creator'}</span></p>
+                <p>Posted on {formattedDate}</p>
+              </div>
+            </div>
+
+            {/* Prompt Card */}
+            <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-slate-100 mb-6 relative overflow-hidden">
+              <h2 className="text-xs font-bold text-slate-400 tracking-[0.2em] uppercase mb-5">
+                PROMPT
+              </h2>
+
+              <p className="text-slate-700 leading-relaxed text-sm md:text-base mb-8 whitespace-pre-wrap font-medium">
                 {prompt.fullContent}
-              </pre>
-            </div>
-          </div>
+              </p>
 
-          {/* Example Output if exists */}
-          {prompt.exampleOutput && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold">Example Output</h2>
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-6 border border-blue-200 dark:border-blue-800">
-                <pre className="text-foreground whitespace-pre-wrap leading-relaxed font-sans">
-                  {JSON.stringify(prompt.exampleOutput, null, 2)}
-                </pre>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95 shadow-md"
+                >
+                  {isCopied ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  {isCopied ? "Copied" : "Copy"}
+                </button>
+                <Link href={`/prompts/${promptId}`}>
+                  <button className="flex items-center justify-center gap-2 bg-white border-2 border-slate-100 hover:border-slate-200 text-slate-700 px-6 py-2.5 rounded-full text-sm font-bold transition-all active:scale-95">
+                    Try this
+                  </button>
+                </Link>
               </div>
             </div>
-          )}
 
-          {/* Tips for Use */}
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">How to Use This Prompt</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                <h3 className="font-medium mb-2">💡 Best Practices</h3>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Copy the entire prompt</li>
-                  <li>• Paste into your AI tool</li>
-                  <li>• Adjust variables as needed</li>
-                  <li>• Experiment with different inputs</li>
-                </ul>
+            {/* Social / Likes Card */}
+            <div className="flex items-center justify-between bg-white rounded-[1.5rem] p-5 shadow-sm border border-slate-100 mb-6">
+              <div className="flex items-center gap-2 text-slate-500 font-medium">
+                <Heart className="w-5 h-5 text-slate-400" />
+                <span>{prompt.purchaseCount ? (prompt.purchaseCount >= 1000 ? (prompt.purchaseCount / 1000).toFixed(1) + 'k' : prompt.purchaseCount) : '1.7k'}</span>
               </div>
-              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                <h3 className="font-medium mb-2">🚀 Pro Tips</h3>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Save for future use</li>
-                  <li>• Share with your team</li>
-                  <li>• Modify for different use cases</li>
-                  <li>• Combine with other prompts</li>
-                </ul>
+              <button className="text-slate-400 hover:text-slate-600 transition-colors">
+                <Bookmark className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tags / Model Card */}
+            <div className="bg-white rounded-[1.5rem] p-6 md:p-8 shadow-sm border border-slate-100">
+              <div className="mb-6">
+                <h3 className="text-xs font-bold text-slate-400 tracking-[0.15em] uppercase mb-2">MODEL OR TOOL</h3>
+                <p className="text-slate-800 font-semibold text-base">ChatGPT</p>
+              </div>
+
+              <div>
+                <h3 className="text-xs font-bold text-slate-400 tracking-[0.15em] uppercase mb-3">TAGS</h3>
+                <div className="flex flex-wrap gap-2">
+                  {prompt.category ? (
+                    <span className="bg-slate-50 text-slate-600 px-4 py-1.5 rounded-full text-xs font-semibold border border-slate-200/60">
+                      {prompt.category.replace("_", " ")}
+                    </span>
+                  ) : null}
+                  <span className="bg-slate-50 text-slate-600 px-4 py-1.5 rounded-full text-xs font-semibold border border-slate-200/60">
+                    Cinematic
+                  </span>
+                  <span className="bg-slate-50 text-slate-600 px-4 py-1.5 rounded-full text-xs font-semibold border border-slate-200/60">
+                    Portrait
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t">
-            <Button
-              onClick={() => {
-                navigator.clipboard.writeText(prompt.fullContent);
-                toast.success("Prompt copied to clipboard!");
-              }}
-              className="flex-1"
-            >
-              Copy
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => router.push("/my-prompts")}
-              className="flex-1"
-            >
-              My Prompts
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

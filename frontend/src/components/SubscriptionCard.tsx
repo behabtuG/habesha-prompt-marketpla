@@ -1,15 +1,9 @@
 "use client";
 
-import { Check, Sparkles, Zap, Trophy, CreditCard } from "lucide-react";
+import { Check, Sparkles, Zap, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-
-interface PlanFeature {
-  label: string;
-  included: boolean;
-}
 
 interface SubscriptionCardProps {
   name: string;

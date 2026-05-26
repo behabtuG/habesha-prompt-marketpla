@@ -14,8 +14,8 @@ async function bootstrap() {
 
   // Get frontend URLs from environment
   const frontendUrl =
-    configService.get('FRONTEND_URL') || 'http://localhost:3000';
-  const ngrokUrl = 'https://narthecal-nonjudicially-carita.ngrok-free.dev';
+    configService.get('FRONTEND_URL') || process.env.FRONTEND_URL;
+  const ngrokUrl = process.env.FRONTEND_URL;
 
   // Enable CORS for multiple origins
   app.enableCors({
@@ -26,6 +26,7 @@ async function bootstrap() {
       const allowedOrigins = [
         'http://localhost:3000',
         'https://narthecal-nonjudicially-carita.ngrok-free.dev',
+        'https://habeshaprompt.loca.lt',
         'http://localhost:4060',
         'https://localhost:3000',
       ];
@@ -33,11 +34,13 @@ async function bootstrap() {
       if (
         allowedOrigins.indexOf(origin) !== -1 ||
         origin.includes('localhost') ||
-        origin.includes('ngrok-free.dev')
+        origin.includes('ngrok-free.dev') ||
+        origin.includes('loca.lt')
       ) {
+        console.log(`CORS allowed origin: ${origin}`);
         callback(null, true);
       } else {
-        logger.warn(`CORS blocked origin: ${origin}`);
+        console.log(`CORS blocked origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     },

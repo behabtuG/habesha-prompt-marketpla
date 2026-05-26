@@ -34,7 +34,7 @@ export enum PaymentMethod {
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
-  private PLATFORM_FEE = 0.2; // 20%
+  private PLATFORM_FEE = 0.1; // 10%
 
   constructor(
     private prisma: PrismaService,
@@ -556,6 +556,22 @@ export class PaymentsService {
      CHECK PROMPT VERSION ACCESS
   =============================== */
   async checkPromptAccess(userId: string, promptId: string) {
+    const prompt = await this.prisma.prompt.findUnique({
+      where: { id: promptId },
+      select: { creatorId: true, version: true }
+    });
+
+    if (prompt && prompt.creatorId === userId) {
+      return {
+        hasAccess: true,
+        canPurchase: false,
+        purchaseStatus: 'COMPLETED',
+        purchasedVersion: prompt.version,
+        currentVersion: prompt.version,
+        needsUpdate: false,
+      };
+    }
+
     const purchase = await this.prisma.purchase.findFirst({
       where: {
         userId,
@@ -805,7 +821,9 @@ export class PaymentsService {
       const pendingPayments = await this.prisma.purchase.findMany({
         where: {
           paymentMethod: PaymentMethod.LOCAL_BIRR,
-          status: PurchaseStatus.PENDING_VERIFICATION,
+          status: {
+            in: [PurchaseStatus.WAITING_VERIFICATION, PurchaseStatus.PENDING_VERIFICATION],
+          },
         },
         include: {
           user: {
