@@ -2,7 +2,6 @@ services:
   - type: web
     name: habesha-backend
     runtime: node
-    # Run all commands inside the backend subdirectory
     rootDir: backend
     buildCommand: npm install && npm run build
     startCommand: npm start
