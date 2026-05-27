@@ -66,6 +66,18 @@ async function bootstrap() {
     next();
   });
 
+  // Global validation pipe
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  // Global prefix
+  app.setGlobalPrefix('api');
+
   // IMPORTANT: Serve static files from the root uploads directory
   const uploadsDir = join(process.cwd(), 'uploads');
   app.useStaticAssets(uploadsDir, {
@@ -96,10 +108,7 @@ async function bootstrap() {
     }),
   );
 
-  // Global prefix
-  app.setGlobalPrefix('api');
-
-  const port = process.env.PORT || configService.get<number>('PORT') || 8080;
+  const port = process.env.PORT || configService.get<number>('PORT') || 800;
   await app.listen(port, '0.0.0.0');
 
   // Use the actual address Render assigns (host = 0.0.0.0, port = process.env.PORT)
