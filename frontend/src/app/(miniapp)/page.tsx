@@ -9,11 +9,8 @@ import {
   Sparkles,
   BookOpen,
   TrendingUp,
-  ShieldCheck,
   MoreHorizontal,
-  ArrowRight,
   ChevronRight,
-  Star,
 } from "lucide-react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
